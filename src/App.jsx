@@ -862,8 +862,13 @@ function LandingPage({ onFindNearMe, onCitySearch }) {
         @keyframes dropIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.5; } }
         @keyframes floatBall { 0%,100% { transform: translateY(0px) rotate(0deg); } 50% { transform: translateY(-18px) rotate(8deg); } }
-        .stats-row { transition: opacity 0.25s ease, filter 0.25s ease, transform 0.25s ease; }
-        .stats-row.dimmed { opacity: 0.15; filter: blur(3px); transform: scale(0.98); pointer-events: none; }
+        .stats-row { transition: opacity 0.3s ease, filter 0.3s ease, transform 0.3s ease; }
+        .stats-row.dimmed { opacity: 0; filter: blur(4px); pointer-events: none; transform: translateY(40px) scale(0.95); }
+        .stat-card { transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease; }
+        .stats-row.dimmed .stat-card:nth-child(1) { transform: translateX(-60px) translateY(20px); opacity: 0; }
+        .stats-row.dimmed .stat-card:nth-child(2) { transform: translateX(-20px) translateY(20px); opacity: 0; }
+        .stats-row.dimmed .stat-card:nth-child(3) { transform: translateX(20px) translateY(20px); opacity: 0; }
+        .stats-row.dimmed .stat-card:nth-child(4) { transform: translateX(60px) translateY(20px); opacity: 0; }
       `}</style>
 
       {/* Nav */}
