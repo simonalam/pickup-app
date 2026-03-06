@@ -906,7 +906,7 @@ function LandingPage({ onFindNearMe, onCitySearch }) {
         <div style={{ animation: "fadeUp 0.6s 0.2s ease both", width: "100%", maxWidth: 560, display: "flex", flexDirection: "column", gap: 12 }}>
 
           {/* City search with autocomplete */}
-          <div ref={wrapperRef} style={{ position: "relative" }}>
+          <div ref={wrapperRef} style={{ position: "relative", zIndex: 200 }}>
             <div style={{ display: "flex", gap: 10 }}>
               <div style={{ flex: 1, position: "relative" }}>
                 <div style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", pointerEvents: "none", display: "flex", alignItems: "center" }}>
@@ -941,7 +941,7 @@ function LandingPage({ onFindNearMe, onCitySearch }) {
 
             {/* Autocomplete dropdown */}
             {showSuggestions && suggestions.length > 0 && (
-              <div style={{ position: "absolute", top: "100%", left: 0, right: 0, background: "#0f1923", border: "1.5px solid #F97316", borderTop: "1px solid #1a2530", borderRadius: "0 0 12px 12px", overflow: "hidden", boxShadow: "0 16px 48px rgba(0,0,0,0.8)", animation: "dropIn 0.15s ease", zIndex: 100 }}>
+              <div style={{ position: "absolute", top: "100%", left: 0, right: 0, background: "#0f1923", border: "1.5px solid #F97316", borderTop: "1px solid #1a2530", borderRadius: "0 0 12px 12px", overflow: "hidden", boxShadow: "0 16px 48px rgba(0,0,0,0.8)", animation: "dropIn 0.15s ease", zIndex: 300 }}>
                 {suggestions.map((s, i) => (
                   <div key={s.place_id} className="land-suggestion"
                     onMouseDown={(e) => { e.preventDefault(); handleSelect(s); }}
@@ -981,7 +981,7 @@ function LandingPage({ onFindNearMe, onCitySearch }) {
         </div>
 
         {/* Stats row */}
-        <div style={{ animation: "fadeUp 0.6s 0.35s ease both", display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginTop: 64, width: "100%", maxWidth: 720 }}>
+        <div style={{ animation: "fadeUp 0.6s 0.35s ease both", display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginTop: 64, width: "100%", maxWidth: 720, position: "relative", zIndex: 1 }}>
           {stats.map(({ icon, value, label }) => (
             <div key={label} className="stat-card" style={{ background: "#0a0f14", border: "1px solid #1a2530", borderRadius: 14, padding: "18px 14px", textAlign: "center", cursor: "default", transition: "all 0.2s" }}>
               <div style={{ fontSize: 24, marginBottom: 6 }}>{icon}</div>
