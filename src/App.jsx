@@ -842,9 +842,9 @@ function LandingPage({ onFindNearMe, onCitySearch }) {
   };
 
   const stats = [
-    { icon: "🏀", value: "3 Sources", label: "Google + OSM + Community" },
-    { icon: "🌍", value: "Global", label: "Search any city worldwide" },
-    { icon: "⭐", value: "Reviews", label: "Real player ratings" },
+    { icon: "🗺️", value: "Every Court", label: "Google · OSM · Community" },
+    { icon: "🌍", value: "Worldwide", label: "Any city, any country" },
+    { icon: "⭐", value: "Real Reviews", label: "Rated by actual hoopers" },
     { icon: "👥", value: "Community", label: "Submit courts you know" },
   ];
 
@@ -862,6 +862,8 @@ function LandingPage({ onFindNearMe, onCitySearch }) {
         @keyframes dropIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.5; } }
         @keyframes floatBall { 0%,100% { transform: translateY(0px) rotate(0deg); } 50% { transform: translateY(-18px) rotate(8deg); } }
+        .stats-row { transition: opacity 0.25s ease, filter 0.25s ease, transform 0.25s ease; }
+        .stats-row.dimmed { opacity: 0.15; filter: blur(3px); transform: scale(0.98); pointer-events: none; }
       `}</style>
 
       {/* Nav */}
@@ -981,7 +983,7 @@ function LandingPage({ onFindNearMe, onCitySearch }) {
         </div>
 
         {/* Stats row */}
-        <div style={{ animation: "fadeUp 0.6s 0.35s ease both", display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginTop: 64, width: "100%", maxWidth: 720, position: "relative", zIndex: 1 }}>
+        <div className={`stats-row${showSuggestions && suggestions.length > 0 ? " dimmed" : ""}`} style={{ animation: "fadeUp 0.6s 0.35s ease both", display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginTop: 64, width: "100%", maxWidth: 720, position: "relative", zIndex: 1 }}>
           {stats.map(({ icon, value, label }) => (
             <div key={label} className="stat-card" style={{ background: "#0a0f14", border: "1px solid #1a2530", borderRadius: 14, padding: "18px 14px", textAlign: "center", cursor: "default", transition: "all 0.2s" }}>
               <div style={{ fontSize: 24, marginBottom: 6 }}>{icon}</div>
