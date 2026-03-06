@@ -424,7 +424,7 @@ function MapComponent({ courts, selected, onSelect, userLocation, centerOn, onMa
   );
 }
 
-function InnerApp({ courts, selected, setSelected, courtSearch, setCourtSearch, view, setView, userLocation, loading, searchLoading, locationName, onMapsLoaded, showSubmit, setShowSubmit, onCourtSubmitted, sourceFilter, setSourceFilter, onLocationSearch, onGoHome, mapCenter, onMapMoved, areaSearchLoading, mapZoom, onZoomChanged }) {
+function InnerApp({ courts, selected, setSelected, courtSearch, setCourtSearch, view, setView, userLocation, loading, searchLoading, locationName, onMapsLoaded, showSubmit, setShowSubmit, onCourtSubmitted, sourceFilter, setSourceFilter, onLocationSearch, onGoHome, onGoToLanding, mapCenter, onMapMoved, areaSearchLoading, mapZoom, onZoomChanged }) {
   const mapsLoadedRef = useRef(false);
   const [locationInput, setLocationInput] = useState("");
   const [suggestions, setSuggestions] = useState([]);
@@ -537,7 +537,7 @@ function InnerApp({ courts, selected, setSelected, courtSearch, setCourtSearch, 
     setCourtSearch("");
     setSuggestions([]);
     setShowSuggestions(false);
-    onGoHome();
+    onGoToLanding();
   };
 
   // zoom < 11 = too far out (~25+ miles visible), show zoom-in nudge instead of courts
@@ -759,7 +759,253 @@ function InnerApp({ courts, selected, setSelected, courtSearch, setCourtSearch, 
   );
 }
 
+
+function LandingPage({ onFindNearMe, onCitySearch }) {
+  const [input, setInput] = useState("");
+  const [suggestions, setSuggestions] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [activeSuggestion, setActiveSuggestion] = useState(-1);
+  const [isFocused, setIsFocused] = useState(false);
+  const autocompleteService = useRef(null);
+  const debounceRef = useRef(null);
+  const wrapperRef = useRef(null);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (window.google?.maps?.places) {
+        clearInterval(interval);
+        autocompleteService.current = new window.google.maps.places.AutocompleteService();
+      }
+    }, 200);
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    const handleClick = (e) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target)) {
+        setShowSuggestions(false);
+        setIsFocused(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  const fetchSuggestions = (value) => {
+    if (!autocompleteService.current || value.length < 2) {
+      setSuggestions([]); setShowSuggestions(false); return;
+    }
+    autocompleteService.current.getPlacePredictions(
+      { input: value, types: ["(cities)"] },
+      (predictions, status) => {
+        if (status === window.google.maps.places.PlacesServiceStatus.OK && predictions) {
+          setSuggestions(predictions.slice(0, 6));
+          setShowSuggestions(true);
+          setActiveSuggestion(-1);
+        } else { setSuggestions([]); setShowSuggestions(false); }
+      }
+    );
+  };
+
+  const handleChange = (e) => {
+    const v = e.target.value;
+    setInput(v);
+    clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => fetchSuggestions(v), 120);
+  };
+
+  const handleSelect = (s) => {
+    setInput(""); setSuggestions([]); setShowSuggestions(false); setIsFocused(false);
+    onCitySearch(s.description);
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === "ArrowDown") { e.preventDefault(); setActiveSuggestion(p => Math.min(p + 1, suggestions.length - 1)); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); setActiveSuggestion(p => Math.max(p - 1, -1)); }
+    else if (e.key === "Enter") {
+      e.preventDefault();
+      if (activeSuggestion >= 0 && suggestions[activeSuggestion]) handleSelect(suggestions[activeSuggestion]);
+      else if (input.trim()) { onCitySearch(input.trim()); setInput(""); setShowSuggestions(false); }
+    }
+    else if (e.key === "Escape") { setShowSuggestions(false); setActiveSuggestion(-1); }
+  };
+
+  const renderText = (s) => {
+    const text = s.description;
+    const m = s.matched_substrings?.[0];
+    if (!m) return <span style={{ color: "#94a3b8" }}>{text}</span>;
+    return (
+      <span style={{ color: "#94a3b8" }}>
+        {text.slice(0, m.offset)}<span style={{ color: "#fff", fontWeight: 700 }}>{text.slice(m.offset, m.offset + m.length)}</span>{text.slice(m.offset + m.length)}
+      </span>
+    );
+  };
+
+  const stats = [
+    { icon: "🏀", value: "3 Sources", label: "Google + OSM + Community" },
+    { icon: "🌍", value: "Global", label: "Search any city worldwide" },
+    { icon: "⭐", value: "Reviews", label: "Real player ratings" },
+    { icon: "👥", value: "Community", label: "Submit courts you know" },
+  ];
+
+  return (
+    <div style={{ minHeight: "100vh", background: "#06090d", color: "#fff", fontFamily: "'DM Sans', sans-serif", display: "flex", flexDirection: "column" }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;600;700;800&display=swap');
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        input { outline: none; } input::placeholder { color: #374151; }
+        .land-suggestion:hover { background: #111d2b !important; }
+        .cta-near:hover { background: #ea6a0a !important; transform: translateY(-2px); box-shadow: 0 12px 40px rgba(249,115,22,0.4) !important; }
+        .cta-city:hover { background: #111d2b !important; transform: translateY(-2px); }
+        .stat-card:hover { border-color: #F97316 !important; background: #0f1923 !important; }
+        @keyframes fadeUp { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes dropIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.5; } }
+        @keyframes floatBall { 0%,100% { transform: translateY(0px) rotate(0deg); } 50% { transform: translateY(-18px) rotate(8deg); } }
+      `}</style>
+
+      {/* Nav */}
+      <nav style={{ padding: "0 32px", height: 64, display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid #0f1923", position: "sticky", top: 0, zIndex: 50, background: "rgba(6,9,13,0.9)", backdropFilter: "blur(12px)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ width: 34, height: 34, background: "#F97316", borderRadius: 9, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>🏀</div>
+          <span style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 30, letterSpacing: "0.08em" }}>PICKUP</span>
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button onClick={onFindNearMe} style={{ background: "none", border: "1px solid #1e2d3d", color: "#94a3b8", borderRadius: 8, padding: "7px 16px", fontFamily: "inherit", fontSize: 13, fontWeight: 600, cursor: "pointer", transition: "all 0.15s" }}
+            onMouseEnter={e => { e.target.style.borderColor = "#F97316"; e.target.style.color = "#F97316"; }}
+            onMouseLeave={e => { e.target.style.borderColor = "#1e2d3d"; e.target.style.color = "#94a3b8"; }}>
+            Open App →
+          </button>
+        </div>
+      </nav>
+
+      {/* Hero */}
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "80px 24px 60px", position: "relative", overflow: "hidden" }}>
+
+        {/* Background glow orbs */}
+        <div style={{ position: "absolute", top: "15%", left: "10%", width: 400, height: 400, borderRadius: "50%", background: "radial-gradient(circle, rgba(249,115,22,0.08) 0%, transparent 70%)", pointerEvents: "none" }} />
+        <div style={{ position: "absolute", bottom: "10%", right: "8%", width: 500, height: 500, borderRadius: "50%", background: "radial-gradient(circle, rgba(59,130,246,0.06) 0%, transparent 70%)", pointerEvents: "none" }} />
+        <div style={{ position: "absolute", top: "40%", right: "20%", width: 300, height: 300, borderRadius: "50%", background: "radial-gradient(circle, rgba(124,58,237,0.06) 0%, transparent 70%)", pointerEvents: "none" }} />
+
+        {/* Floating basketball */}
+        <div style={{ fontSize: 72, marginBottom: 24, animation: "floatBall 3.5s ease-in-out infinite", filter: "drop-shadow(0 0 32px rgba(249,115,22,0.4))" }}>🏀</div>
+
+        {/* Headline */}
+        <div style={{ animation: "fadeUp 0.6s ease both", textAlign: "center", marginBottom: 16 }}>
+          <h1 style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: "clamp(52px, 8vw, 96px)", letterSpacing: "0.04em", lineHeight: 0.95, color: "#fff" }}>
+            FIND YOUR<br />
+            <span style={{ color: "#F97316" }}>NEXT RUN</span>
+          </h1>
+        </div>
+
+        <p style={{ animation: "fadeUp 0.6s 0.1s ease both", color: "#64748b", fontSize: 18, textAlign: "center", maxWidth: 480, lineHeight: 1.6, marginBottom: 48 }}>
+          Discover basketball courts near you or anywhere in the world. Real courts, real reviews, from real hoopers.
+        </p>
+
+        {/* Search + CTAs */}
+        <div style={{ animation: "fadeUp 0.6s 0.2s ease both", width: "100%", maxWidth: 560, display: "flex", flexDirection: "column", gap: 12 }}>
+
+          {/* City search with autocomplete */}
+          <div ref={wrapperRef} style={{ position: "relative" }}>
+            <div style={{ display: "flex", gap: 10 }}>
+              <div style={{ flex: 1, position: "relative" }}>
+                <div style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", pointerEvents: "none", display: "flex", alignItems: "center" }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={isFocused ? "#F97316" : "#4a5568"} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transition: "stroke 0.15s" }}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                </div>
+                <input
+                  value={input}
+                  onChange={handleChange}
+                  onKeyDown={handleKeyDown}
+                  onFocus={() => { setIsFocused(true); if (input.length >= 2) setShowSuggestions(true); }}
+                  placeholder="Search a city — New York, Tokyo, London..."
+                  style={{
+                    width: "100%", background: isFocused ? "#0f1923" : "#0a0f14",
+                    border: `1.5px solid ${isFocused ? "#F97316" : "#1e2d3d"}`,
+                    borderRadius: showSuggestions && suggestions.length > 0 ? "12px 12px 0 0" : "12px",
+                    padding: "14px 14px 14px 42px", color: "#fff", fontFamily: "inherit", fontSize: 15,
+                    transition: "border-color 0.15s, background 0.15s",
+                  }}
+                />
+                {input && (
+                  <button onClick={() => { setInput(""); setSuggestions([]); setShowSuggestions(false); }}
+                    style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "#1e2d3d", border: "none", color: "#94a3b8", borderRadius: "50%", width: 22, height: 22, cursor: "pointer", fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center" }}>×</button>
+                )}
+              </div>
+              <button
+                onClick={() => { if (input.trim()) { onCitySearch(input.trim()); setInput(""); setShowSuggestions(false); } }}
+                className="cta-city"
+                style={{ background: "#0f1923", border: "1.5px solid #1e2d3d", color: "#fff", borderRadius: 12, padding: "14px 22px", fontFamily: "inherit", fontSize: 14, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap", transition: "all 0.2s", flexShrink: 0 }}>
+                Search City
+              </button>
+            </div>
+
+            {/* Autocomplete dropdown */}
+            {showSuggestions && suggestions.length > 0 && (
+              <div style={{ position: "absolute", top: "100%", left: 0, right: 0, background: "#0f1923", border: "1.5px solid #F97316", borderTop: "1px solid #1a2530", borderRadius: "0 0 12px 12px", overflow: "hidden", boxShadow: "0 16px 48px rgba(0,0,0,0.8)", animation: "dropIn 0.15s ease", zIndex: 100 }}>
+                {suggestions.map((s, i) => (
+                  <div key={s.place_id} className="land-suggestion"
+                    onMouseDown={(e) => { e.preventDefault(); handleSelect(s); }}
+                    onMouseEnter={() => setActiveSuggestion(i)}
+                    style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", cursor: "pointer", borderBottom: i < suggestions.length - 1 ? "1px solid #0a0f14" : "none", background: activeSuggestion === i ? "#111d2b" : "transparent", transition: "background 0.1s" }}>
+                    <div style={{ flexShrink: 0, width: 32, height: 32, borderRadius: 8, background: activeSuggestion === i ? "#1a2d42" : "#0a0f14", border: `1px solid ${activeSuggestion === i ? "#F97316" : "#1e2d3d"}`, display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.1s" }}>
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={activeSuggestion === i ? "#F97316" : "#4a5568"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 14, lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{renderText(s)}</div>
+                      <div style={{ fontSize: 11, color: "#374151", marginTop: 2 }}>{s.structured_formatting?.secondary_text || "City"}</div>
+                    </div>
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#1e2d3d" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+                  </div>
+                ))}
+                <div style={{ padding: "6px 16px", background: "#06090d", borderTop: "1px solid #0a0f14", display: "flex", alignItems: "center", gap: 5 }}>
+                  <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#374151" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                  <span style={{ fontSize: 10, color: "#374151" }}>Powered by Google</span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Divider */}
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <div style={{ flex: 1, height: 1, background: "#0f1923" }} />
+            <span style={{ color: "#374151", fontSize: 12, fontWeight: 600, letterSpacing: "0.08em" }}>OR</span>
+            <div style={{ flex: 1, height: 1, background: "#0f1923" }} />
+          </div>
+
+          {/* Find Near Me CTA */}
+          <button onClick={onFindNearMe} className="cta-near"
+            style={{ width: "100%", background: "#F97316", border: "none", color: "#fff", borderRadius: 12, padding: "16px", fontFamily: "inherit", fontSize: 16, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 10, transition: "all 0.2s", boxShadow: "0 8px 32px rgba(249,115,22,0.25)" }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>
+            Find Courts Near Me
+          </button>
+        </div>
+
+        {/* Stats row */}
+        <div style={{ animation: "fadeUp 0.6s 0.35s ease both", display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginTop: 64, width: "100%", maxWidth: 720 }}>
+          {stats.map(({ icon, value, label }) => (
+            <div key={label} className="stat-card" style={{ background: "#0a0f14", border: "1px solid #1a2530", borderRadius: 14, padding: "18px 14px", textAlign: "center", cursor: "default", transition: "all 0.2s" }}>
+              <div style={{ fontSize: 24, marginBottom: 6 }}>{icon}</div>
+              <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 20, letterSpacing: "0.05em", color: "#F97316", lineHeight: 1 }}>{value}</div>
+              <div style={{ color: "#4a5568", fontSize: 11, marginTop: 4, lineHeight: 1.4 }}>{label}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Footer */}
+      <div style={{ borderTop: "1px solid #0f1923", padding: "16px 32px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <div style={{ width: 22, height: 22, background: "#F97316", borderRadius: 5, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11 }}>🏀</div>
+          <span style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 18, letterSpacing: "0.08em", color: "#4a5568" }}>PICKUP</span>
+        </div>
+        <span style={{ color: "#1e2d3d", fontSize: 12 }}>Find courts. Run games. Come back.</span>
+      </div>
+    </div>
+  );
+}
+
 export default function PickUpApp() {
+  const [page, setPage] = useState("landing");
   const [courts, setCourts] = useState([]);
   const [selected, setSelected] = useState(null);
   const [courtSearch, setCourtSearch] = useState("");
@@ -866,7 +1112,9 @@ export default function PickUpApp() {
     setMapZoom(zoom);
   }, []);
 
-  useEffect(() => {
+  const handleFindNearMe = useCallback(() => {
+    setPage("app");
+    setLoading(true);
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
@@ -895,6 +1143,11 @@ export default function PickUpApp() {
     );
   }, [fetchCourts]);
 
+  const handleLandingCitySearch = useCallback((query) => {
+    setPage("app");
+    handleLocationSearch(query);
+  }, [handleLocationSearch]);
+
   const filtered = courts.filter(c =>
     c.name.toLowerCase().includes(courtSearch.toLowerCase()) ||
     c.address?.toLowerCase().includes(courtSearch.toLowerCase())
@@ -907,6 +1160,9 @@ export default function PickUpApp() {
 
   return (
     <APIProvider apiKey={MAPS_KEY} libraries={["places"]}>
+      {page === "landing" ? (
+        <LandingPage onFindNearMe={handleFindNearMe} onCitySearch={handleLandingCitySearch} />
+      ) : (
       <InnerApp
         courts={filtered}
         selected={selected}
@@ -927,12 +1183,14 @@ export default function PickUpApp() {
         setSourceFilter={setSourceFilter}
         onLocationSearch={handleLocationSearch}
         onGoHome={handleGoHome}
+        onGoToLanding={() => setPage("landing")}
         mapCenter={mapCenter}
         onMapMoved={handleMapMoved}
         areaSearchLoading={areaSearchLoading}
         mapZoom={mapZoom}
         onZoomChanged={handleZoomChanged}
       />
+      )}
     </APIProvider>
   );
 }
